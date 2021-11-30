@@ -20,6 +20,7 @@ import (
 	"log"
 	"net"
 	"os"
+	_ "runtime/trace"
 	"sync"
 
 	"github.com/campoy/whispering-gophers/util"
@@ -31,7 +32,7 @@ var (
 )
 
 type Message struct {
-	// TODO: add ID field
+	Id   string
 	Addr string
 	Body string
 }
@@ -117,7 +118,9 @@ func serve(c net.Conn) {
 			return
 		}
 
-		// TODO: If this message has seen before, ignore it.
+		if Seen(m.Id) {
+			continue
+		}
 
 		fmt.Printf("%#v\n", m)
 		broadcast(m)
@@ -129,11 +132,11 @@ func readInput() {
 	s := bufio.NewScanner(os.Stdin)
 	for s.Scan() {
 		m := Message{
-			// TODO: use util.RandomID to populate the ID field.
+			Id:   util.RandomID(),
 			Addr: self,
 			Body: s.Text(),
 		}
-		// TODO: Mark the message ID as seen.
+		Seen(m.Id)
 		broadcast(m)
 	}
 	if err := s.Err(); err != nil {
@@ -169,12 +172,18 @@ func dial(addr string) {
 	}
 }
 
-// TODO: Create a new map of seen message IDs and a mutex to protect it.
+type seenIds struct {
+	m  map[string]bool
+	mu sync.Mutex
+}
 
 // Seen returns true if the specified id has been seen before.
 // If not, it returns false and marks the given id as "seen".
 func Seen(id string) bool {
-	// TODO: Get a write lock on the seen message IDs map and unlock it at before returning.
-	// TODO: Check if the id has been seen before and return that later.
-	// TODO: Mark the ID as seen in the map.
+	s := seenIds{m: make(map[string]bool)}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.m[id]
+	s.m[id] = true
+	return ok
 }
